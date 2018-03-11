@@ -3,8 +3,24 @@ const cTable = require('console.table')
 
 const user = casper.cli.options.QUANTUM_USER
 const pass = casper.cli.options.QUANTUM_PASS
+var historyHeader = null
+var historyData = []
+var lastBtcBrl = 0
 
-casper.start('https://quantum.atlasproj.com/br/login/', function () {
+casper.start()
+
+casper.thenOpen('https://www.mercadobitcoin.net/api/BTC/ticker/', {
+    method: 'get',
+    headers: {
+        'Accept': 'application/json'
+    }
+}, function () {
+    const content = JSON.parse(this.getPageContent())
+    lastBtcBrl = content.ticker.last
+    console.log('BTC: ', toMoney(content.ticker.last))
+})
+
+casper.thenOpen('https://quantum.atlasproj.com/br/login/', function () {
     this.echo(this.getTitle())
 })
 
@@ -22,13 +38,10 @@ casper.waitWhileSelector('.login-form', function() {
     this.echo(this.getTitle())
 })
 
-const trSelector = 'table tbody tr'
-var historyHeader = null
-var historyData = []
 const paginate = function (page) {
     casper.thenOpen('https://quantum.atlasproj.com/history.php?page=' + page, function() {
-        this.echo(this.getTitle() + '-' + page)
-        hasRows = this.exists(trSelector)
+        this.echo(this.getTitle() + ' - ' + page)
+        hasRows = this.exists('table tbody tr')
         if (!hasRows) {
             this.echo('NO MORE HISTORY', 'INFO')
         } else {
@@ -74,6 +87,14 @@ const fetchHistoryPageHeader = function () {
     return arr
 }
 
+const toMoney = function (value) {
+    return 'R$' + parseFloat(value).toFixed(2)
+}
+
+const toPercent = function (value) {
+    return parseFloat(value).toFixed(2) + '%'
+}
+
 casper.run(function() {
     const count = historyData.length
     const dateStart = historyData[historyData.length - 1][0]
@@ -81,7 +102,11 @@ casper.run(function() {
     const dateEnd = historyData[0][0]
     const valueEnd = historyData[0][4]
     const diff = valueEnd - valueStart
-    const profit = (100 * diff / valueStart).toFixed(2) + '%'
+    const profit = toPercent(100 * diff / valueStart)
+    const PvInitial = lastBtcBrl * valueStart
+    const PvEnd = lastBtcBrl * valueEnd
+    const PvDiff = PvEnd - PvInitial
+    const PvProfit = toPercent(100 * diff / valueStart)
 
     const report = {
         count: count,
@@ -92,9 +117,18 @@ casper.run(function() {
         diff: diff,
         profit: profit,
     }
+    
+    const presentValue = {
+        BTC: toMoney(lastBtcBrl),
+        initial: toMoney(PvInitial),
+        end: toMoney(PvEnd),
+        diff: toMoney(PvDiff),
+        profit: toPercent(PvProfit)
+    }
 
     console.table(historyHeader, historyData)
-    console.table([report])
+    console.table('Total', [report])
+    console.table('Present Value', [presentValue])
     
     this.echo('THE END', 'INFO').exit()
 })
