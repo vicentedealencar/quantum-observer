@@ -11,7 +11,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "casperjs": "^1.1.4"
+    "casperjs": "^1.1.4",
+    "console.table": "^0.10.0"
   },
   "devDependencies": {
     "nodemon": "^1.17.1"

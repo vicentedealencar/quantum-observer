@@ -1,4 +1,5 @@
 const casper = require('casper').create()
+const cTable = require('console.table')
 
 const user = casper.cli.options.QUANTUM_USER
 const pass = casper.cli.options.QUANTUM_PASS
@@ -17,15 +18,12 @@ casper.then(function () {
     }, true)
 })
 
-casper.then(function () {
-    this.reload()
-})
-
-casper.then(function () {
+casper.waitWhileSelector('.login-form', function() {
     this.echo(this.getTitle())
 })
 
 const trSelector = 'table tbody tr'
+var historyHeader = null
 var historyData = []
 const paginate = function (page) {
     casper.thenOpen('https://quantum.atlasproj.com/history.php?page=' + page, function() {
@@ -34,6 +32,7 @@ const paginate = function (page) {
         if (!hasRows) {
             this.echo('NO MORE HISTORY', 'INFO')
         } else {
+            historyHeader = this.evaluate(fetchHistoryPageHeader)
             const infos = this.evaluate(fetchHistoryPageData)
             historyData = historyData.concat(infos)
             paginate(page + 1)
@@ -65,7 +64,15 @@ const fetchHistoryPageData = function() {
     return arrarr
 }
 
-
+const fetchHistoryPageHeader = function () {
+    const tr =  document.querySelectorAll('table thead tr')[0]
+    const arr = []
+    for (var i = 0; i < tr.children.length; i++) {
+        const td = tr.children[i]
+        arr.push(td.innerText)
+    }
+    return arr
+}
 
 casper.run(function() {
     const count = historyData.length
@@ -74,7 +81,7 @@ casper.run(function() {
     const dateEnd = historyData[0][0]
     const valueEnd = historyData[0][4]
     const diff = valueEnd - valueStart
-    const profit = diff / valueStart
+    const profit = (100 * diff / valueStart).toFixed(2) + '%'
 
     const report = {
         count: count,
@@ -86,7 +93,8 @@ casper.run(function() {
         profit: profit,
     }
 
-    console.log(JSON.stringify(report, null, 2))
+    console.table(historyHeader, historyData)
+    console.table([report])
     
-    this.echo('FIM').exit()
+    this.echo('THE END', 'INFO').exit()
 })
